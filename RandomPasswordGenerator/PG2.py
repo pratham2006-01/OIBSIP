@@ -1,5 +1,6 @@
 import random
 import string
+import math
 
 # quick and dirty password generator, nothing fancy
 
