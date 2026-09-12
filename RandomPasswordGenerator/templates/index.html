@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cipher</title>
+
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap"
+    rel="stylesheet"
+  >
+
+  <style>
+    /* ---------- reset ---------- */
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #05050a;
+      font-family: 'Cormorant Garamond', serif;
+      color: #e8e6f0;
+    }
+
+    /* ---------- ambient background ---------- */
+    canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+
+    /* ---------- layout ---------- */
+    .stage {
+      position: relative;
+      z-index: 1;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .card {
+      width: 92%;
+      max-width: 400px;
+      padding: 48px 40px;
+      text-align: center;
+      background: rgba(18, 16, 28, 0.45);
+      border: 1px solid rgba(180, 160, 255, 0.12);
+      border-radius: 20px;
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      box-shadow: 0 0 80px rgba(120, 90, 255, 0.06);
+    }
+
+    /* ---------- header ---------- */
+    .eyebrow {
+      margin: 0 0 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: #7d74a8;
+    }
+
+    h1 {
+      margin: 0 0 28px;
+      font-weight: 600;
+      font-size: 28px;
+      color: #f2f0fa;
+    }
+
+    /* ---------- orb ---------- */
+    .orb-wrap {
+      position: relative;
+      height: 90px;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .orb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #d9c8ff, #8a6fe8 60%, transparent);
+      box-shadow: 0 0 20px 6px rgba(150, 120, 255, 0.5);
+      animation: breathe 3.4s ease-in-out infinite;
+    }
+
+    @keyframes breathe {
+      0%, 100% { transform: scale(1);   opacity: 0.7; }
+      50%      { transform: scale(1.6); opacity: 1;   }
+    }
+
+    .orb.flare {
+      animation: flare 0.9s ease-out;
+    }
+
+    @keyframes flare {
+      40%  { transform: scale(3.2); box-shadow: 0 0 60px 24px rgba(180, 150, 255, 0.85); }
+      100% { transform: scale(1.6); box-shadow: 0 0 20px 6px rgba(150, 120, 255, 0.5);   }
+    }
+
+    .orb.thinking {
+      animation: think 0.7s ease-in-out infinite;
+    }
+
+    @keyframes think {
+      0%, 100% { opacity: 0.4; }
+      50%      { opacity: 1;   }
+    }
+
+    .ring {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 1px solid rgba(150, 120, 255, 0.5);
+      opacity: 0;
+    }
+
+    .ring.pulse {
+      animation: ripple 0.9s ease-out;
+    }
+
+    @keyframes ripple {
+      0%   { width: 14px;  height: 14px;  opacity: 0.8; }
+      100% { width: 140px; height: 140px; opacity: 0;   }
+    }
+
+    /* ---------- password readout ---------- */
+    .result {
+      margin-bottom: 28px;
+    }
+
+    .pw-row {
+      margin-bottom: 12px;
+    }
+
+    #pw {
+      min-height: 24px;
+      padding: 14px 16px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      white-space: nowrap;
+      background: rgba(10, 9, 16, 0.4);
+      border: 1px solid rgba(180, 160, 255, 0.1);
+      border-radius: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 17px;
+      letter-spacing: 0.06em;
+      line-height: 24px;
+      color: #d9c8ff;
+      scrollbar-width: thin;
+    }
+
+    #pw::-webkit-scrollbar {
+      height: 4px;
+    }
+    #pw::-webkit-scrollbar-thumb {
+      background: rgba(180, 160, 255, 0.25);
+      border-radius: 2px;
+    }
+
+    .copy-btn {
+      flex-shrink: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin: 0 auto;
+      padding: 0 14px;
+      height: 30px;
+      border: 1px solid rgba(180, 160, 255, 0.25);
+      border-radius: 7px;
+      background: rgba(138, 111, 232, 0.12);
+      color: #b7a9e8;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s, background 0.2s;
+    }
+
+    .copy-btn.visible {
+      display: flex;
+    }
+
+    .copy-btn:hover {
+      border-color: rgba(180, 160, 255, 0.6);
+      color: #f2f0fa;
+      background: rgba(138, 111, 232, 0.22);
+    }
+
+    .copy-btn svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .copy-btn.copied {
+      border-color: #8a6fe8;
+      color: #d9c8ff;
+    }
+
+    #pw span {
+      opacity: 0;
+      animation: materialize 0.5s ease forwards;
+    }
+
+    @keyframes materialize {
+      from { opacity: 0; filter: blur(6px); transform: translateY(4px); }
+      to   { opacity: 1; filter: blur(0);   transform: translateY(0);   }
+    }
+
+    #pw.empty {
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-size: 16px;
+      color: #5c5578;
+    }
+
+    #whisper {
+      min-height: 18px;
+      margin-bottom: 6px;
+      font-size: 13px;
+      line-height: 1.5;
+      font-style: italic;
+      color: #7d74a8;
+    }
+
+    #whisper.error {
+      color: #c9877d;
+    }
+
+    #strengthTag {
+      display: block;
+      min-height: 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: #5c5578;
+      transition: color 0.3s, text-shadow 0.3s;
+    }
+
+    #strengthTag.titanic {
+      color: #e8c874;
+      text-shadow: 0 0 12px rgba(232, 200, 116, 0.5);
+      letter-spacing: 0.3em;
+    }
+
+    /* ---------- options ---------- */
+    details {
+      margin-bottom: 24px;
+      text-align: left;
+    }
+
+    summary {
+      padding-bottom: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: #7d74a8;
+      cursor: pointer;
+    }
+
+    details[open] summary {
+      margin-bottom: 4px;
+      border-bottom: 1px solid rgba(180, 160, 255, 0.1);
+    }
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 11px 0;
+      font-size: 14px;
+      line-height: 1.3;
+      color: #c4bfe0;
+      border-bottom: 1px solid rgba(180, 160, 255, 0.07);
+    }
+
+    .row:last-of-type {
+      border-bottom: none;
+    }
+
+    input[type="checkbox"] {
+      width: 15px;
+      height: 15px;
+      accent-color: #8a6fe8;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      margin: 8px 0 4px;
+      accent-color: #8a6fe8;
+    }
+
+    .len-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: #d9c8ff;
+    }
+
+    /* ---------- action ---------- */
+    button {
+      width: 100%;
+      padding: 14px;
+      margin-top: 6px;
+      border: 1px solid rgba(180, 160, 255, 0.3);
+      border-radius: 12px;
+      background: linear-gradient(135deg, rgba(138, 111, 232, 0.25), rgba(90, 70, 180, 0.15));
+      color: #f2f0fa;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: box-shadow 0.3s, border-color 0.3s;
+    }
+
+    button:hover {
+      box-shadow: 0 0 30px rgba(138, 111, 232, 0.35);
+      border-color: rgba(180, 160, 255, 0.6);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+  </style>
+</head>
+
+<body>
+
+  <canvas id="field"></canvas>
+
+  <div class="stage">
+    <div class="card">
+
+      <p class="eyebrow">Something Unseen Watches</p>
+      <h1>The Cipher</h1>
+
+      <div class="orb-wrap">
+        <div class="ring" id="ring"></div>
+        <div class="orb" id="orb"></div>
+      </div>
+
+      <div class="result">
+        <div class="pw-row">
+          <div id="pw" class="empty">it hasn't spoken yet</div>
+        </div>
+        <button class="copy-btn" id="copyBtn" title="Copy to clipboard" aria-label="Copy passphrase to clipboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          <span id="copyLabel">Copy</span>
+        </button>
+        <div id="whisper">touch the sigil below</div>
+        <span id="strengthTag"></span>
+      </div>
+
+      <details>
+        <summary>adjust the ritual</summary>
+
+        <div class="row">
+          <span>length</span>
+          <span class="len-val"><span id="lenVal">14</span> chars</span>
+        </div>
+        <input type="range" id="len" min="8" max="64" value="14">
+
+        <div class="row"><span>uppercase</span><input type="checkbox" id="upper" checked></div>
+        <div class="row"><span>lowercase</span><input type="checkbox" id="lower" checked></div>
+        <div class="row"><span>numbers</span><input type="checkbox" id="digits" checked></div>
+        <div class="row"><span>symbols</span><input type="checkbox" id="symbols"></div>
+        <div class="row"><span>exclude ambiguous</span><input type="checkbox" id="excludeAmbig"></div>
+      </details>
+
+      <button id="genBtn">Summon</button>
+
+    </div>
+  </div>
+
+  <script>
+    /* =========================================================
+       AMBIENT PARTICLE FIELD
+    ========================================================= */
+
+    const canvas = document.getElementById('field');
+    const ctx = canvas.getContext('2d');
+
+    let width, height;
+    let particles = [];
+    let burstStrength = 0;
+
+    function resizeCanvas() {
+      width = canvas.width = innerWidth;
+      height = canvas.height = innerHeight;
+    }
+
+    function createParticles(count) {
+      particles = [];
+      for (let i = 0; i < count; i++) {
+        particles.push({
+          x: Math.random() * width,
+          y: Math.random() * height,
+          r: Math.random() * 1.4 + 0.3,
+          vx: (Math.random() - 0.5) * 0.06,
+          vy: -(Math.random() * 0.15 + 0.03),
+          a: Math.random() * 0.5 + 0.1
+        });
+      }
+    }
+
+    function drawGlow() {
+      const gradient = ctx.createRadialGradient(
+        width / 2, height * 0.4, 0,
+        width / 2, height * 0.4, Math.max(width, height) * 0.7
+      );
+      gradient.addColorStop(0, `rgba(90, 60, 160, ${0.10 + burstStrength * 0.06})`);
+      gradient.addColorStop(1, 'rgba(5, 5, 10, 0)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, width, height);
+    }
+
+    function drawParticles() {
+      particles.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.y < -5) p.y = height + 5;
+        if (p.x < -5) p.x = width + 5;
+        if (p.x > width + 5) p.x = -5;
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(200, 185, 255, ${p.a})`;
+        ctx.fill();
+      });
+    }
+
+    function animate() {
+      ctx.clearRect(0, 0, width, height);
+      drawGlow();
+      drawParticles();
+      burstStrength *= 0.94;
+      requestAnimationFrame(animate);
+    }
+
+    resizeCanvas();
+    createParticles(70);
+    animate();
+    addEventListener('resize', resizeCanvas);
+
+    /* =========================================================
+       WHISPERS — flavor text keyed to the backend's strength label
+    ========================================================= */
+
+    const WHISPERS = {
+      weak: [
+        "it flickers, uncertain",
+        "the veil is thin here",
+        "not much stands guard"
+      ],
+      medium: [
+        "steady, for now",
+        "it holds its shape",
+        "an adequate ward"
+      ],
+      strong: [
+        "it remembers nothing",
+        "no eye will find it twice",
+        "cast once, then gone",
+        "held in the dark now"
+      ],
+      titanic: [
+        "unsinkable, they said",
+        "not even the deep could hold this",
+        "a fortress with no gate",
+        "nothing survives the crossing"
+      ]
+    };
+
+    const $ = id => document.getElementById(id);
+    let currentPassword = "";
+
+    /* =========================================================
+       API CALL — generation happens server-side (Flask + secrets)
+    ========================================================= */
+
+    async function requestPassword(payload) {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "the ritual failed");
+      return data;
+    }
+
+    function renderPassword(password) {
+      currentPassword = password;
+
+      const pwEl = $("pw");
+      pwEl.classList.remove("empty");
+      pwEl.innerHTML = "";
+
+      [...password].forEach((char, i) => {
+        const span = document.createElement("span");
+        span.textContent = char;
+        span.style.animationDelay = `${i * 25}ms`;
+        pwEl.appendChild(span);
+      });
+
+      $("copyBtn").classList.add("visible");
+      $("copyBtn").classList.remove("copied");
+    }
+
+    async function copyPassword(silent = false) {
+      if (!currentPassword) return;
+
+      try {
+        await navigator.clipboard.writeText(currentPassword);
+        const btn = $("copyBtn");
+        btn.classList.add("copied");
+        $("copyLabel").textContent = "Copied";
+        setTimeout(() => {
+          btn.classList.remove("copied");
+          $("copyLabel").textContent = "Copy";
+        }, 1200);
+
+        if (!silent) {
+          $("whisper").textContent = "taken, quietly";
+          $("whisper").classList.remove("error");
+        }
+      } catch {
+        if (!silent) {
+          $("whisper").textContent = "it wouldn't let go — copy it by hand";
+          $("whisper").classList.add("error");
+        }
+      }
+    }
+
+    function renderStrength(strength) {
+      const pool = WHISPERS[strength.label] || WHISPERS.medium;
+      const pick = pool[Math.floor(Math.random() * pool.length)];
+
+      $("whisper").textContent = pick;
+      $("whisper").classList.remove("error");
+
+      const tag = $("strengthTag");
+      tag.textContent = strength.label;
+      tag.classList.toggle("titanic", strength.label === "titanic");
+    }
+
+    function playFlareEffect() {
+      const orb = $("orb");
+      const ring = $("ring");
+
+      orb.classList.remove("flare");
+      void orb.offsetWidth; // restart animation
+      orb.classList.add("flare");
+
+      ring.classList.remove("pulse");
+      void ring.offsetWidth;
+      ring.classList.add("pulse");
+
+      burstStrength = 1;
+    }
+
+    function setThinking(isThinking) {
+      $("orb").classList.toggle("thinking", isThinking);
+      $("genBtn").disabled = isThinking;
+    }
+
+    async function generate() {
+      const payload = {
+        length: +$("len").value,
+        upper: $("upper").checked,
+        lower: $("lower").checked,
+        digits: $("digits").checked,
+        symbols: $("symbols").checked,
+        excludeAmbiguous: $("excludeAmbig").checked
+      };
+
+      setThinking(true);
+      $("whisper").classList.remove("error");
+
+      try {
+        const data = await requestPassword(payload);
+
+        renderPassword(data.password);
+        renderStrength(data.strength);
+        playFlareEffect();
+
+        await copyPassword(true); // auto-copy on generation, silent
+      } catch (err) {
+        $("whisper").textContent = err.message;
+        $("whisper").classList.add("error");
+        $("strengthTag").textContent = "";
+        $("strengthTag").classList.remove("titanic");
+      } finally {
+        setThinking(false);
+      }
+    }
+
+    /* =========================================================
+       EVENT BINDINGS
+    ========================================================= */
+
+    $("len").oninput = () => $("lenVal").textContent = $("len").value;
+    $("genBtn").onclick = generate;
+    $("copyBtn").onclick = () => copyPassword(false);
+  </script>
+
+</body>
+</html>
